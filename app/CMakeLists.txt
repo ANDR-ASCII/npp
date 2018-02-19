@@ -33,11 +33,11 @@ if(MSVC)
 		PROPERTIES COMPILE_FLAGS "/FI\"stdafx.h\""
 	)
 	
-	set_target_properties(
-		${AppName} 
-		PROPERTIES WIN32_EXECUTABLE YES
-		LINK_FLAGS "/ENTRY:mainCRTStartup"
-	)
+#	set_target_properties(
+#		${AppName} 
+#		PROPERTIES WIN32_EXECUTABLE YES
+#		LINK_FLAGS "/ENTRY:mainCRTStartup"
+#	)
 endif()
 
 include_directories(
