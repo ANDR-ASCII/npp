@@ -1,6 +1,6 @@
 #include "transport_packet_v1.h"
 
-namespace Npp
+namespace Test
 {
 
 TransportPacketV1::TransportPacketV1(const TransportHeaderV1& header, const std::vector<std::uint8_t>& data)

@@ -4,7 +4,7 @@
 #include "address_wrapper.h"
 #include "itransport_packet.h"
 
-namespace Npp
+namespace Test
 {
 
 class NetworkPacket

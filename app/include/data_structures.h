@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Npp
+namespace Test
 {
 
 using NetworkV2AddressType = std::uint8_t[6];
@@ -32,9 +32,9 @@ struct TransportHeaderV2
 {
 	std::uint16_t sourcePort;
 	std::uint16_t destinationPort;
-	std::uint16_t dataSize;
 	std::uint32_t fragment;
 	std::uint8_t mask;
+	std::uint16_t dataSize;
 };
 
 }

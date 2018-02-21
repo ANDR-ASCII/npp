@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Npp
+namespace Test
 {
 
 enum class TransportPacketVersion

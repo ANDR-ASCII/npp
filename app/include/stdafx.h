@@ -29,3 +29,5 @@
 #include <limits>
 #include <fstream>
 #include <iostream>
+
+#include <winsock2.h>

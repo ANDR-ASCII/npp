@@ -1,6 +1,6 @@
 #include "address_wrapper.h"
 
-namespace Npp
+namespace Test
 {
 
 AddressWrapper::AddressWrapper(std::uint32_t addr)

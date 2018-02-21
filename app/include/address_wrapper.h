@@ -2,7 +2,7 @@
 
 #include "data_structures.h"
 
-namespace Npp
+namespace Test
 {
 
 class AddressWrapper

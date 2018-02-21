@@ -3,7 +3,7 @@
 #include "data_structures.h"
 #include "itransport_packet.h"
 
-namespace Npp
+namespace Test
 {
 
 class TransportPacketV1 : public ITransportPacket
