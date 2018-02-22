@@ -1,4 +1,6 @@
 #include "packets_reader.h"
+#include "helpers.h"
+#include "thread_pool.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -30,6 +32,9 @@ struct PacketRawData
 	const std::vector<std::uint8_t>* buffer;
 	std::size_t startIndex;
 };
+
+std::mutex mutex;
+std::atomic_int counter = 0;
 
 class CreatePacketTask
 {
@@ -79,13 +84,20 @@ public:
 
 		auto backInserter = std::back_inserter(packetData);
 
+		mutex.lock();
+
+		std::system("cls");
+		std::cout << ++counter << std::endl;
+
+		mutex.unlock();
+
 		std::copy(
 			m_packetRawData.buffer->begin() + m_packetRawData.startIndex, 
-			m_packetRawData.buffer->end(),
+			m_packetRawData.buffer->begin() + m_packetRawData.startIndex + networkHeader.dataSize,
 			backInserter
 		);
 
-		return Test::NetworkPacket(networkHeader, std::move(packetData));
+		return Test::NetworkPacket(Test::NetworkPacketData{ networkHeader, std::move(packetData) });
 	}
 
 private:
@@ -99,6 +111,8 @@ namespace Test
 
 std::vector<NetworkPacket> PacketsReader::read(std::ifstream& stream)
 {
+	//ThreadPool pool;
+
 	stream.seekg(0, std::ios::end);
 
 	std::vector<std::uint8_t> buffer;
@@ -112,7 +126,7 @@ std::vector<NetworkPacket> PacketsReader::read(std::ifstream& stream)
 	}
 
 	std::vector<NetworkPacket> result;
-	std::vector<PacketRawData> packetsRawData;
+	std::vector<std::future<NetworkPacket>> futures;
 
 	for (std::size_t i = 0; i < buffer.size();)
 	{
@@ -121,15 +135,25 @@ std::vector<NetworkPacket> PacketsReader::read(std::ifstream& stream)
 		const std::size_t dataSizeOffset = (buffer[i] == 1 ? s_dataSizeV1Offset : s_dataSizeV2Offset);
 		const std::size_t dataOffset = (buffer[i] == 1 ? s_dataV1Offset : s_dataV2Offset);
 
-		std::uint16_t dataSize = ntohs(*reinterpret_cast<std::uint16_t*>(buffer.data() + i + dataSizeOffset));
-		dataSize = ntohs(dataSize);
+		const std::uint16_t dataSize = ntohs(*reinterpret_cast<std::uint16_t*>(buffer.data() + i + dataSizeOffset));
 
-		packetsRawData.push_back(PacketRawData{ &buffer, i });
+		//futures.push_back(pool.pushTask(CreatePacketTask(PacketRawData{ &buffer, i })));
+		futures.push_back(std::async(CreatePacketTask(PacketRawData{ &buffer, i })));
 
 		i += dataOffset + dataSize;
+
+		if (i == buffer.size() - 1)
+		{
+			break;
+		}
 	}
 
+	result.reserve(futures.size());
 
+	for (std::size_t i = 0; i < futures.size(); ++i)
+	{
+		result.push_back(futures[i].get());
+	}
 
 	return result;
 }

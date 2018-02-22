@@ -7,12 +7,20 @@
 namespace Test
 {
 
-class NetworkPacket
+struct NetworkPacketData
+{
+	NetworkHeader header;
+	std::vector<std::uint8_t> data;
+};
+
+class NetworkPacket final
 {
 public:
-	NetworkPacket(const NetworkHeader& header, const std::vector<std::uint8_t>& data);
-	NetworkPacket(const NetworkHeader& header, std::vector<std::uint8_t>&& data);
+	NetworkPacket();
+	NetworkPacket(const NetworkPacketData& data);
+	NetworkPacket(NetworkPacketData&& data);
 
+	bool isValid() const noexcept;
 	std::uint8_t version() const noexcept;
 	AddressWrapper sourceAddress() const noexcept;
 	AddressWrapper destinationAddress() const noexcept;
@@ -22,8 +30,8 @@ public:
 	std::shared_ptr<ITransportPacket> transportPacket() const;
 
 private:
-	NetworkHeader m_header;
-	std::vector<std::uint8_t> m_data;
+	bool m_isValid;
+	NetworkPacketData m_networkPacketData;
 };
 
 }
