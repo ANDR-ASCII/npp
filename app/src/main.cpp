@@ -1,20 +1,21 @@
-#include "data_structures.h"
-#include "address_wrapper.h"
-#include "packets_reader.h"
-#include "helpers.h"
+#include "packets_statistic_collector.h"
 
 int main(int argc, char** argv)
 {
-	std::ifstream stream("network_0.raw", std::ios_base::binary);
+	if (argc == 1)
+	{
+		std::cout << "this_program_name.exe [file_to_parse]" << std::endl;
 
-	if (stream)
-	{
-		Test::PacketsReader::read(stream);
+		std::cin.get();
+		return 0;
 	}
-	else
-	{
-		std::cout << "Cannot open the file";
-	}
+
+	std::string filepath = argv[1];
+
+	Test::PacketsStatisticCollector statCollector(filepath);
+
+	std::cout << "Network V1 packets count: " << statCollector.networkV1PacketsCount() << std::endl;
+	std::cout << "Network V2 packets count: " << statCollector.networkV2PacketsCount() << std::endl;
 
 	std::cin.get();
 	return 0;
