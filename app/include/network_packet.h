@@ -27,11 +27,15 @@ public:
 	std::uint8_t protocol() const noexcept;
 	std::uint16_t dataSize() const noexcept;
 	std::uint16_t headerChecksum() const noexcept;
-	std::shared_ptr<ITransportPacket> transportPacket() const;
+	ITransportPacket* transportPacket() const;
+
+private:
+	void parseEmbeddedPacket();
 
 private:
 	bool m_isValid;
 	NetworkPacketData m_networkPacketData;
+	std::unique_ptr<ITransportPacket> m_embeddedTransportPacket;
 };
 
 }

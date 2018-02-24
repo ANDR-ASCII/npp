@@ -31,17 +31,19 @@ public:
 	{
 		NetworkHeader networkHeader;
 
-		std::memcpy(&networkHeader.version, m_packetRawData.buffer->data() + m_packetRawData.startIndex + g_np_versionOffset, sizeof(std::uint8_t));
+		const std::uint8_t* packetPointer = m_packetRawData.buffer->data() + m_packetRawData.startIndex;
+
+		std::memcpy(&networkHeader.version, packetPointer + g_np_versionOffset, sizeof(std::uint8_t));
 
 		assert(networkHeader.version == 1 || networkHeader.version == 2);
 
 		if (networkHeader.version == 1)
 		{
-			std::memcpy(&networkHeader.sourceAddress.v1, m_packetRawData.buffer->data() + m_packetRawData.startIndex + g_np_sourceAddressOffset, sizeof(std::uint32_t));
-			std::memcpy(&networkHeader.destinationAddress.v1, m_packetRawData.buffer->data() + m_packetRawData.startIndex + g_np_destinationAddressV1Offset, sizeof(std::uint32_t));
-			std::memcpy(&networkHeader.protocol, m_packetRawData.buffer->data() + m_packetRawData.startIndex + g_np_protocolV1Offset, sizeof(std::uint8_t));
-			std::memcpy(&networkHeader.dataSize, m_packetRawData.buffer->data() + m_packetRawData.startIndex + g_np_dataSizeV1Offset, sizeof(std::uint16_t));
-			std::memcpy(&networkHeader.headerChecksum, m_packetRawData.buffer->data() + m_packetRawData.startIndex + g_np_headerChecksumV1Offset, sizeof(std::uint16_t));
+			std::memcpy(&networkHeader.sourceAddress.v1, packetPointer + g_np_sourceAddressOffset, sizeof(std::uint32_t));
+			std::memcpy(&networkHeader.destinationAddress.v1, packetPointer + g_np_destinationAddressV1Offset, sizeof(std::uint32_t));
+			std::memcpy(&networkHeader.protocol, packetPointer + g_np_protocolV1Offset, sizeof(std::uint8_t));
+			std::memcpy(&networkHeader.dataSize, packetPointer + g_np_dataSizeV1Offset, sizeof(std::uint16_t));
+			std::memcpy(&networkHeader.headerChecksum, packetPointer + g_np_headerChecksumV1Offset, sizeof(std::uint16_t));
 
 			Helpers::fromBigEndian(networkHeader.sourceAddress.v1);
 			Helpers::fromBigEndian(networkHeader.destinationAddress.v1);
@@ -50,11 +52,11 @@ public:
 		}
 		else
 		{
-			std::memcpy(&networkHeader.sourceAddress.v2, m_packetRawData.buffer->data() + m_packetRawData.startIndex + g_np_sourceAddressOffset, sizeof(NetworkV2AddressType));
-			std::memcpy(&networkHeader.destinationAddress.v2, m_packetRawData.buffer->data() + m_packetRawData.startIndex + g_np_destinationAddressV2Offset, sizeof(NetworkV2AddressType));
-			std::memcpy(&networkHeader.protocol, m_packetRawData.buffer->data() + m_packetRawData.startIndex + g_np_protocolV2Offset, sizeof(std::uint8_t));
-			std::memcpy(&networkHeader.dataSize, m_packetRawData.buffer->data() + m_packetRawData.startIndex + g_np_dataSizeV2Offset, sizeof(std::uint16_t));
-			std::memcpy(&networkHeader.headerChecksum, m_packetRawData.buffer->data() + m_packetRawData.startIndex + g_np_headerChecksumV2Offset, sizeof(std::uint16_t));
+			std::memcpy(&networkHeader.sourceAddress.v2, packetPointer + g_np_sourceAddressOffset, sizeof(NetworkV2AddressType));
+			std::memcpy(&networkHeader.destinationAddress.v2, packetPointer + g_np_destinationAddressV2Offset, sizeof(NetworkV2AddressType));
+			std::memcpy(&networkHeader.protocol, packetPointer + g_np_protocolV2Offset, sizeof(std::uint8_t));
+			std::memcpy(&networkHeader.dataSize, packetPointer + g_np_dataSizeV2Offset, sizeof(std::uint16_t));
+			std::memcpy(&networkHeader.headerChecksum, packetPointer + g_np_headerChecksumV2Offset, sizeof(std::uint16_t));
 
 			Helpers::fromBigEndian(networkHeader.sourceAddress.v2);
 			Helpers::fromBigEndian(networkHeader.destinationAddress.v2);
@@ -65,15 +67,17 @@ public:
 		std::vector<std::uint8_t> packetData;
 		packetData.reserve(networkHeader.dataSize);
 
-		auto backInserter = std::back_inserter(packetData);
+		const std::size_t dataOffset = networkHeader.version == 1 ? g_np_dataV1Offset : g_np_dataV2Offset;
 
 		std::copy(
-			m_packetRawData.buffer->begin() + m_packetRawData.startIndex,
-			m_packetRawData.buffer->begin() + m_packetRawData.startIndex + networkHeader.dataSize,
-			backInserter
+			m_packetRawData.buffer->begin() + m_packetRawData.startIndex + dataOffset,
+			m_packetRawData.buffer->begin() + m_packetRawData.startIndex + dataOffset + networkHeader.dataSize,
+			std::back_inserter(packetData)
 		);
 
-		m_packetRawData.callback(std::make_shared<NetworkPacket>(NetworkPacketData{ networkHeader, std::move(packetData) }));
+		std::shared_ptr<NetworkPacket> packet = std::make_shared<NetworkPacket>(NetworkPacketData{ networkHeader, std::move(packetData) });
+
+		m_packetRawData.callback(std::move(packet));
 	}
 
 private:
@@ -89,8 +93,6 @@ PacketsStatisticCollector::PacketsStatisticCollector(const std::string& filepath
 	: m_isValid(false)
 	, m_networkV1PacketsCount(0)
 	, m_networkV2PacketsCount(0)
-	, m_networkV1UniqueAddrsCount(0)
-	, m_networkV2UniqueAddrsCount(0)
 	, m_transportV1PacketsCount(0)
 	, m_transportV2PacketsCount(0)
 	, m_transportV1PacketsBrokenChecksumCount(0)
@@ -110,9 +112,9 @@ PacketsStatisticCollector::PacketsStatisticCollector(const std::string& filepath
 
 void PacketsStatisticCollector::collect(std::ifstream& stream)
 {
-	std::cout << "Processing..." << std::endl;
+	ThreadPool pool;
 
-	// ThreadPool pool;
+	std::cout << "Processing..." << std::endl;
 
 	stream.seekg(0, std::ios::end);
 
@@ -121,10 +123,19 @@ void PacketsStatisticCollector::collect(std::ifstream& stream)
 
 	stream.seekg(0, std::ios::beg);
 
-	while (!stream.eof())
+	while (true)
 	{
-		buffer.push_back(stream.get());
+		const char ch = stream.get();
+		
+		if (stream.eof() && stream.fail())
+		{
+			break;
+		}
+
+		buffer.push_back(ch);
 	}
+
+	auto start = std::chrono::high_resolution_clock::now();
 
 	std::vector<std::future<void>> futures;
 
@@ -135,7 +146,10 @@ void PacketsStatisticCollector::collect(std::ifstream& stream)
 		const std::size_t dataSizeOffset = (buffer[i] == 1 ? g_np_dataSizeV1Offset : g_np_dataSizeV2Offset);
 		const std::size_t dataOffset = (buffer[i] == 1 ? g_np_dataV1Offset : g_np_dataV2Offset);
 
-		const std::uint16_t dataSize = ntohs(*reinterpret_cast<std::uint16_t*>(buffer.data() + i + dataSizeOffset));
+		std::uint16_t dataSize = 0;
+
+		std::memcpy(&dataSize, buffer.data() + i + dataSizeOffset, sizeof(std::uint16_t));
+		Helpers::fromBigEndian(dataSize);
 
 		const auto callback = [this](std::shared_ptr<NetworkPacket> packet)
 		{
@@ -143,21 +157,20 @@ void PacketsStatisticCollector::collect(std::ifstream& stream)
 		};
 
 		// In this case main thread may be idle
-		// futures.push_back(pool.pushTask(CreatePacketTask(PacketRawData{ &buffer, i, callback })));
+		futures.push_back(pool.pushTask(CreatePacketTask(PacketRawData{ &buffer, i, callback })));
 
-		futures.push_back(std::async(CreatePacketTask(PacketRawData{ &buffer, i, callback })));
+		//futures.push_back(std::async(CreatePacketTask(PacketRawData{ &buffer, i, callback })));
 
 		i += dataOffset + dataSize;
-
-		if (i == buffer.size() - 1)
-		{
-			break;
-		}
 	}
 
 	std::for_each(futures.begin(), futures.end(), [](const std::future<void>& future) { future.wait(); });
 
 	std::cout << "Done!" << std::endl;
+
+	auto end = std::chrono::high_resolution_clock::now();
+
+	std::cout << "Elapsed time ms: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << std::endl << std::endl;
 }
 
 bool PacketsStatisticCollector::isValid() const noexcept
@@ -167,19 +180,42 @@ bool PacketsStatisticCollector::isValid() const noexcept
 
 void PacketsStatisticCollector::add(std::shared_ptr<NetworkPacket> packet)
 {
-	{
-		std::lock_guard<std::mutex> locker(m_mutex);
-		m_allPackets.emplace_back(std::move(packet));
-	}
-
 	if (packet->version() == 1)
 	{
 		++m_networkV1PacketsCount;
+
+		std::lock_guard<std::mutex> locker(m_uniqueNetworkV1Addresses.mutex);
+		m_uniqueNetworkV1Addresses.collection.insert(packet->sourceAddress().absoluteValue());
+		m_uniqueNetworkV1Addresses.collection.insert(packet->destinationAddress().absoluteValue());
 	}
 
 	if (packet->version() == 2)
 	{
 		++m_networkV2PacketsCount;
+
+		std::lock_guard<std::mutex> locker(m_uniqueNetworkV2Addresses.mutex);
+		m_uniqueNetworkV2Addresses.collection.insert(packet->sourceAddress().absoluteValue());
+		m_uniqueNetworkV2Addresses.collection.insert(packet->destinationAddress().absoluteValue());
+	}
+
+	if (packet->protocol() == 1)
+	{
+		++m_transportV1PacketsCount;
+
+		if (packet->transportPacket()->hasBrokenChecksum())
+		{
+			++m_transportV1PacketsBrokenChecksumCount;
+		}
+	}
+
+	if (packet->protocol() == 2)
+	{
+		++m_transportV2PacketsCount;
+
+		if (packet->transportPacket()->hasBrokenChecksum())
+		{
+			++m_transportV2PacketsBrokenChecksumCount;
+		}
 	}
 }
 
@@ -193,14 +229,16 @@ int PacketsStatisticCollector::networkV2PacketsCount() const noexcept
 	return m_networkV2PacketsCount;
 }
 
-int PacketsStatisticCollector::networkV1UniqueAddrsCount() const noexcept
+std::size_t PacketsStatisticCollector::networkV1UniqueAddrsCount() const noexcept
 {
-	return m_networkV1UniqueAddrsCount;
+	std::lock_guard<std::mutex> locker(m_uniqueNetworkV1Addresses.mutex);
+	return m_uniqueNetworkV1Addresses.collection.size();
 }
 
-int PacketsStatisticCollector::networkV2UniqueAddrsCount() const noexcept
+std::size_t PacketsStatisticCollector::networkV2UniqueAddrsCount() const noexcept
 {
-	return m_networkV2UniqueAddrsCount;
+	std::lock_guard<std::mutex> locker(m_uniqueNetworkV2Addresses.mutex);
+	return m_uniqueNetworkV2Addresses.collection.size();
 }
 
 int PacketsStatisticCollector::transportV1PacketsCount() const noexcept
@@ -231,6 +269,11 @@ int PacketsStatisticCollector::transportV1UniquePortsCount() const noexcept
 int PacketsStatisticCollector::transportV2UniquePortsCount() const noexcept
 {
 	return m_transportV2UniquePortsCount;
+}
+
+int PacketsStatisticCollector::networkPacketsCount() const noexcept
+{
+	return m_networkV1PacketsCount + m_networkV2PacketsCount;
 }
 
 }

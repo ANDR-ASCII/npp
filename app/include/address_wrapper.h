@@ -5,7 +5,7 @@
 namespace Test
 {
 
-class AddressWrapper
+class AddressWrapper final
 {
 private:
 	enum Version
@@ -19,6 +19,10 @@ public:
 	AddressWrapper(const NetworkV2AddressType& addr);
 
 	std::string toString() const;
+	std::uint64_t absoluteValue() const;
+
+	friend bool operator==(const AddressWrapper& lhs, const AddressWrapper& rhs);
+	friend bool operator!=(const AddressWrapper& lhs, const AddressWrapper& rhs);
 
 private:
 	Address m_addr;

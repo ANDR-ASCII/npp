@@ -16,6 +16,8 @@ public:
 	virtual std::uint16_t sourcePort() const noexcept = 0;
 	virtual std::uint16_t destinationPort() const noexcept = 0;
 	virtual std::uint16_t dataSize() const noexcept = 0;
+	virtual std::uint16_t checksum() const noexcept = 0;
+	virtual bool hasBrokenChecksum() const noexcept = 0;
 };
 
 }
